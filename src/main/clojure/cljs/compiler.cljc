@@ -362,7 +362,7 @@
 (defn emits-keyword [kw]
   (let [ns   (namespace kw)
         name (name kw)]
-    (emits "new cljs.core.Keyword(")
+    (emits "new " util/dkalias ".Keyword(")
     (emit-constant ns)
     (emits ",")
     (emit-constant name)
@@ -380,7 +380,7 @@
         symstr (if-not (nil? ns)
                  (str ns "/" name)
                  name)]
-    (emits "new cljs.core.Symbol(")
+    (emits "new " util/dkalias ".Symbol(")
     (emit-constant ns)
     (emits ",")
     (emit-constant name)
@@ -395,13 +395,13 @@
 (defmethod emit-constant* #?(:clj clojure.lang.Keyword :cljs Keyword) [x]
   (if-let [value (and (-> @env/*compiler* :options :emit-constants)
                       (-> @env/*compiler* ::ana/constant-table x))]
-    (emits "cljs.core." value)
+    (emits "" util/dkalias "." value)
     (emits-keyword x)))
 
 (defmethod emit-constant* #?(:clj clojure.lang.Symbol :cljs Symbol) [x]
   (if-let [value (and (-> @env/*compiler* :options :emit-constants)
                       (-> @env/*compiler* ::ana/constant-table x))]
-    (emits "cljs.core." value)
+    (emits "" util/dkalias "." value)
     (emits-symbol x)))
 
 (defn emit-constants-comma-sep [cs]
@@ -422,7 +422,7 @@
 
 (defmethod emit-constant* #?(:clj java.util.UUID :cljs UUID) [^java.util.UUID uuid]
   (let [uuid-str (.toString uuid)]
-    (emits "new cljs.core.UUID(\"" uuid-str "\", " (hash uuid-str) ")")))
+    (emits "new " util/dkalias ".UUID(\"" uuid-str "\", " (hash uuid-str) ")")))
 
 (defmethod emit-constant* #?(:clj JSValue :cljs cljs.tagged-literals/JSValue) [^JSValue v]
   (let [items (.-val v)]
@@ -493,11 +493,11 @@
   {:pre [(ana/ast? sym) (ana/ast? meta)]}
   (let [{:keys [name]} (:info var)]
     (emit-wrap env
-      (emits "new cljs.core.Var(function(){return " (munge name) ";},"
+      (emits "new " util/dkalias ".Var(function(){return " (munge name) ";},"
         sym "," meta ")"))))
 
 (defn emit-with-meta [expr meta]
-  (emits "cljs.core.with_meta(" expr "," meta ")"))
+  (emits "" util/dkalias ".with_meta(" expr "," meta ")"))
 
 (defmethod emit* :with-meta
   [{:keys [expr meta env]}]
@@ -512,19 +512,19 @@
 (defn emit-map [keys vals comma-sep distinct-keys?]
   (cond
     (zero? (count keys))
-    (emits "cljs.core.PersistentArrayMap.EMPTY")
+    (emits "" util/dkalias ".PersistentArrayMap.EMPTY")
 
     (<= (count keys) array-map-threshold)
     (if (distinct-keys? keys)
-      (emits "new cljs.core.PersistentArrayMap(null, " (count keys) ", ["
+      (emits "new " util/dkalias ".PersistentArrayMap(null, " (count keys) ", ["
         (comma-sep (interleave keys vals))
         "], null)")
-      (emits "cljs.core.PersistentArrayMap.createAsIfByAssoc(["
+      (emits "" util/dkalias ".PersistentArrayMap.createAsIfByAssoc(["
         (comma-sep (interleave keys vals))
         "])"))
 
     :else
-    (emits "cljs.core.PersistentHashMap.fromArrays(["
+    (emits "" util/dkalias ".PersistentHashMap.fromArrays(["
       (comma-sep keys)
       "],["
       (comma-sep vals)
@@ -537,17 +537,17 @@
 
 (defn emit-list [items comma-sep]
   (if (empty? items)
-    (emits "cljs.core.List.EMPTY")
-    (emits "cljs.core.list(" (comma-sep items) ")")))
+    (emits "" util/dkalias ".List.EMPTY")
+    (emits "" util/dkalias ".list(" (comma-sep items) ")")))
 
 (defn emit-vector [items comma-sep]
   (if (empty? items)
-    (emits "cljs.core.PersistentVector.EMPTY")
+    (emits "" util/dkalias ".PersistentVector.EMPTY")
     (let [cnt (count items)]
       (if (< cnt 32)
-        (emits "new cljs.core.PersistentVector(null, " cnt
-          ", 5, cljs.core.PersistentVector.EMPTY_NODE, ["  (comma-sep items) "], null)")
-        (emits "cljs.core.PersistentVector.fromArray([" (comma-sep items) "], true)")))))
+        (emits "new " util/dkalias ".PersistentVector(null, " cnt
+          ", 5, " util/dkalias ".PersistentVector.EMPTY_NODE, ["  (comma-sep items) "], null)")
+        (emits "" util/dkalias ".PersistentVector.fromArray([" (comma-sep items) "], true)")))))
 
 (defmethod emit* :vector
   [{:keys [items env]}]
@@ -562,13 +562,13 @@
 (defn emit-set [items comma-sep distinct-constants?]
   (cond
     (empty? items)
-    (emits "cljs.core.PersistentHashSet.EMPTY")
+    (emits "" util/dkalias ".PersistentHashSet.EMPTY")
 
     (distinct-constants? items)
-    (emits "new cljs.core.PersistentHashSet(null, new cljs.core.PersistentArrayMap(null, " (count items) ", ["
+    (emits "new " util/dkalias ".PersistentHashSet(null, new " util/dkalias ".PersistentArrayMap(null, " (count items) ", ["
       (comma-sep (interleave items (repeat "null"))) "], null), null)")
 
-    :else (emits "cljs.core.PersistentHashSet.createAsIfByAssoc([" (comma-sep items) "])")))
+    :else (emits "" util/dkalias ".PersistentHashSet.createAsIfByAssoc([" (comma-sep items) "])")))
 
 (defmethod emit* :set
   [{:keys [items env]}]
@@ -639,10 +639,10 @@
       (falsey-constant? test) (emitln else)
       :else
       (if (= :expr context)
-        (emits "(" (when checked "cljs.core.truth_") "(" test ")?" then ":" else ")")
+        (emits "(" (when checked "" util/dkalias ".truth_") "(" test ")?" then ":" else ")")
         (do
           (if checked
-            (emitln "if(cljs.core.truth_(" test ")){")
+            (emitln "if(" util/dkalias ".truth_(" test ")){")
             (emitln "if(" test "){"))
           (emitln then "} else {")
           (emitln else "}"))))))
@@ -843,17 +843,17 @@
     (doseq [[i param] (map-indexed vector (drop-last 2 params))]
       (emits "var ")
       (emit param)
-      (emits " = cljs.core.first(")
+      (emits " = " util/dkalias ".first(")
       (emitln arglist ");")
-      (emitln arglist " = cljs.core.next(" arglist ");"))
+      (emitln arglist " = " util/dkalias ".next(" arglist ");"))
     (if (< 1 (count params))
       (do
         (emits "var ")
         (emit (last (butlast params)))
-        (emitln " = cljs.core.first(" arglist ");")
+        (emitln " = " util/dkalias ".first(" arglist ");")
         (emits "var ")
         (emit (last params))
-        (emitln " = cljs.core.rest(" arglist ");")
+        (emitln " = " util/dkalias ".rest(" arglist ");")
         (emits "return " delegate-name "(")
         (doseq [param params]
           (emit param)
@@ -862,7 +862,7 @@
       (do
         (emits "var ")
         (emit (last params))
-        (emitln " = cljs.core.seq(" arglist ");")
+        (emitln " = " util/dkalias ".seq(" arglist ");")
         (emits "return " delegate-name "(")
         (doseq [param params]
           (emit param)
@@ -939,7 +939,7 @@
         (emitln " = null;")
         (emitln "if (arguments.length > " (dec (count params)) ") {")
         (let [a (emit-arguments-to-array (dec (count params)))]
-          (emitln "  " (last params) " = new cljs.core.IndexedSeq(" a ",0,null);"))
+          (emitln "  " (last params) " = new " util/dkalias ".IndexedSeq(" a ",0,null);"))
         (emitln "} "))
       (emits "return " delegate-name ".call(this,")
       (doseq [param params]
@@ -952,7 +952,7 @@
       (emits mname ".cljs$lang$applyTo = ")
       (emit-apply-to (assoc f :name name))
       (emitln ";")
-      (emitln mname ".cljs$core$IFn$_invoke$arity$variadic = " delegate-name ";")
+      (emitln mname "." util/dkalias "$IFn$_invoke$arity$variadic = " delegate-name ";")
       (emitln "return " mname ";")
       (emitln "})()"))))
 
@@ -1008,9 +1008,9 @@
                     (emitln "var " restarg " = null;")
                     (emitln "if (arguments.length > " max-fixed-arity ") {")
                     (let [a (emit-arguments-to-array max-fixed-arity)]
-                      (emitln restarg " = new cljs.core.IndexedSeq(" a ",0,null);"))
+                      (emitln restarg " = new " util/dkalias ".IndexedSeq(" a ",0,null);"))
                     (emitln "}")
-                    (emitln "return " n ".cljs$core$IFn$_invoke$arity$variadic("
+                    (emitln "return " n "." util/dkalias "$IFn$_invoke$arity$variadic("
                             (comma-sep (butlast maxparams))
                             (when (> (count maxparams) 1) ", ")
                             restarg ");")))
@@ -1030,8 +1030,8 @@
           (doseq [[n meth] ms]
             (let [c (count (:params meth))]
               (if (:variadic? meth)
-                (emitln mname ".cljs$core$IFn$_invoke$arity$variadic = " n ".cljs$core$IFn$_invoke$arity$variadic;")
-                (emitln mname ".cljs$core$IFn$_invoke$arity$" c " = " n ";"))))
+                (emitln mname "." util/dkalias "$IFn$_invoke$arity$variadic = " n "." util/dkalias "$IFn$_invoke$arity$variadic;")
+                (emitln mname "." util/dkalias "$IFn$_invoke$arity$" c " = " n ";"))))
           (emitln "return " mname ";")
           (emitln "})()")))
       (when loop-locals
@@ -1171,7 +1171,7 @@
              [(update-in f [:info]
                 (fn [info]
                   (-> info
-                    (assoc :name (symbol (str (munge info) ".cljs$core$IFn$_invoke$arity$variadic")))
+                    (assoc :name (symbol (str (munge info) "." util/dkalias "$IFn$_invoke$arity$variadic")))
                     ;; bypass local fn-self-name munging, we're emitting direct
                     ;; shadowing already applied
                     (update-in [:info]
@@ -1185,7 +1185,7 @@
                  [(update-in f [:info]
                     (fn [info]
                       (-> info
-                        (assoc :name (symbol (str (munge info) ".cljs$core$IFn$_invoke$arity$" arity)))
+                        (assoc :name (symbol (str (munge info) "." util/dkalias "$IFn$_invoke$arity$" arity)))
                         ;; bypass local fn-self-name munging, we're emitting direct
                         ;; shadowing already applied
                         (update-in [:info]
@@ -1206,13 +1206,13 @@
          (emits (first args) "." pimpl "(" (comma-sep (cons "null" (rest args))) ")"))
 
        keyword?
-       (emits f ".cljs$core$IFn$_invoke$arity$" (count args) "(" (comma-sep args) ")")
+       (emits f "." util/dkalias "$IFn$_invoke$arity$" (count args) "(" (comma-sep args) ")")
 
        variadic-invoke
        (let [mfa (:max-fixed-arity variadic-invoke)]
         (emits f "(" (comma-sep (take mfa args))
                (when-not (zero? mfa) ",")
-               "cljs.core.prim_seq.cljs$core$IFn$_invoke$arity$2(["
+               "" util/dkalias ".prim_seq." util/dkalias "$IFn$_invoke$arity$2(["
                (comma-sep (drop mfa args)) "], 0))"))
 
        (or fn? js? goog?)
@@ -1221,7 +1221,7 @@
        :else
        (if (and ana/*cljs-static-fns* (#{:var :local :js-var} (:op f)))
          ;; higher order case, static information missing
-         (let [fprop (str ".cljs$core$IFn$_invoke$arity$" (count args))]
+         (let [fprop (str "." util/dkalias "$IFn$_invoke$arity$" (count args))]
            (if ana/*fn-invoke-direct*
              (emits "(" f fprop " ? " f fprop "(" (comma-sep args) ") : "
                     f "(" (comma-sep args) "))")
@@ -1266,8 +1266,8 @@
                                      [nil libs]))
         global-exports-libs (filter ana/dep-has-global-exports? libs-to-load)]
     (when (-> libs meta :reload-all)
-      (emitln "if(!COMPILED) " loaded-libs-temp " = " loaded-libs " || cljs.core.set([\"cljs.core\"]);")
-      (emitln "if(!COMPILED) " loaded-libs " = cljs.core.set([\"cljs.core\"]);"))
+      (emitln "if(!COMPILED) " loaded-libs-temp " = " loaded-libs " || " util/dkalias ".set([\"" util/dkalias "\"]);")
+      (emitln "if(!COMPILED) " loaded-libs " = " util/dkalias ".set([\"" util/dkalias "\"]);"))
     (doseq [lib libs-to-load]
       (cond
         #?@(:clj
@@ -1280,7 +1280,7 @@
                (if (= :nodejs target)
                  ;; under node.js we load foreign libs globally
                  (let [ijs (get js-dependency-index (name lib))]
-                   (emitln "cljs.core.load_file("
+                   (emitln "" util/dkalias ".load_file("
                      (-> (io/file (util/output-directory options)
                                   (or (deps/-relative-path ijs)
                                       (util/relative-name (:url ijs))))
@@ -1313,7 +1313,7 @@
       (let [{:keys [global-exports]} (get js-dependency-index (name lib))]
         (emit-global-export ns-name global-exports lib)))
     (when (-> libs meta :reload-all)
-      (emitln "if(!COMPILED) " loaded-libs " = cljs.core.into(" loaded-libs-temp ", " loaded-libs ");"))))
+      (emitln "if(!COMPILED) " loaded-libs " = " util/dkalias ".into(" loaded-libs-temp ", " loaded-libs ");"))))
 
 (defmethod emit* :ns*
   [{:keys [name requires uses require-macros reloads env deps]}]
@@ -1401,8 +1401,8 @@
        (clojure.string/replace file-str #"\.cljs$" ".js")
 
        (.endsWith file-str ".cljc")
-       (if (= "cljs/core.cljc" file-str)
-         "cljs/core$macros.js"
+       (if (= (str util/dkalias ".cljc") file-str)
+         (str util/dkalias "$macros.js")
          (clojure.string/replace file-str #"\.cljc$" ".js"))
 
        :else
@@ -1420,7 +1420,7 @@
       {:pre [(or (nil? opts) (map? opts))
              (fn? body)]}
       (when-not (get-in @env/*compiler* [::ana/namespaces 'cljs.core :defs])
-        (ana/analyze-file "cljs/core.cljs" opts))
+        (ana/analyze-file util/dkpath opts))
       (body))))
 
 #?(:clj
@@ -1444,7 +1444,7 @@
      (and (= :none (:optimizations opts))
           (not= "cljc" ext)
           (= 'cljs.core ns)
-          (io/resource "cljs/core.aot.js"))))
+          (io/resource util/dkaot))))
 
 #?(:clj
    (defn macro-ns? [ns ext opts]
@@ -1458,14 +1458,14 @@
      ;; no need to bother with analysis cache reading, handled by
      ;; with-core-cljs
      (when (or ana/*verbose* (:verbose opts))
-       (util/debug-prn "Using cached cljs.core" (str src)))
+       (util/debug-prn "Using cached " util/dkpath "" (str src)))
      (spit dest (slurp cached))
      (.setLastModified ^File dest (util/last-modified src))
      (when (true? (:source-map opts))
        (spit (io/file (str dest ".map"))
          (json/write-str
            (assoc
-             (json/read-str (slurp (io/resource "cljs/core.aot.js.map")))
+             (json/read-str (slurp (io/resource util/dkaot ".map")))
              "file"
              (str (io/file (util/output-directory opts) "cljs" "core.js"))))))
      (merge
@@ -1635,7 +1635,7 @@
                      version (util/clojurescript-version)]
                  (and version (not= version version')))
                (and opts
-                    (not (and (io/resource "cljs/core.aot.js") (= 'cljs.core ns)))
+                    (not (and (io/resource util/dkaot) (= util/dkns-sym ns)))
                     (not= (ana/build-affecting-options opts)
                           (ana/build-affecting-options (util/build-options dest))))
                (and opts (:source-map opts)
@@ -1789,7 +1789,7 @@
   (doseq [[sym value] table]
     (let [ns   (namespace sym)
           name (name sym)]
-      (emits "cljs.core." value " = ")
+      (emits "" util/dkalias "." value " = ")
       (cond
         (keyword? sym) (emits-keyword sym)
         (symbol? sym) (emits-symbol sym)

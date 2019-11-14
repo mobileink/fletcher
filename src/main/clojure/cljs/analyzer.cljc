@@ -1252,7 +1252,7 @@
              (when (some? confirm)
                (confirm env 'cljs.core sym))
              (merge (gets @env/*compiler* ::namespaces 'cljs.core :defs sym)
-               {:name (symbol "cljs.core" (str sym))
+               {:name (symbol util/dkalias (str sym))
                 :op :var
                 :ns 'cljs.core}))
 
@@ -1294,7 +1294,7 @@
     (cond
       (some? (namespace sym))
       (let [ns (namespace sym)
-            ns (if (= "clojure.core" ns) "cljs.core" ns)
+            ns (if (= "clojure.core" ns) util/dkalias ns)
             full-ns (resolve-macro-ns-alias env ns)
             #?@(:cljs [full-ns (if-not (string/ends-with? (str full-ns) "$macros")
                                  (symbol (str full-ns "$macros"))
@@ -3061,7 +3061,7 @@
           name         (vary-meta name merge metadata)
           {excludes :excludes core-renames :renames} (parse-ns-excludes env args)
           core-renames (reduce (fn [m [original renamed]]
-                                 (assoc m renamed (symbol "cljs.core" (str original))))
+                                 (assoc m renamed (symbol util/dkns-str (str original))))
                          {} core-renames)
           deps         (atom [])
           aliases      (atom {:fns {} :macros {}})
@@ -3174,7 +3174,7 @@
                           :cljs (list specs)))
         {excludes :excludes core-renames :renames} (parse-ns-excludes env args)
         core-renames (reduce (fn [m [original renamed]]
-                               (assoc m renamed (symbol "cljs.core" (str original))))
+                               (assoc m renamed (symbol util/dkns-str (str original))))
                        {} core-renames)
         deps         (atom [])
         aliases      (atom {:fns {} :macros {}})
@@ -3738,7 +3738,7 @@
               ;; to resolve calls to `my-ns.core/foo` to `my-ns.core$macros/foo`
               ;; to avoid undeclared variable warnings - António Monteiro
               #?@(:cljs [sym (if (and sym-ns
-                                   (not= sym-ns "cljs.core")
+                                   (not= sym-ns util/dkns)
                                    (gstring/endsWith cur-ns "$macros")
                                    (not (gstring/endsWith sym-ns "$macros"))
                                    (= sym-ns (subs cur-ns 0 (- (count cur-ns) 7))))
@@ -3881,7 +3881,7 @@
                          :cljs (symbol-identical? sym' JS_STAR_SYM))
                     (let [sym   (if (some? (namespace sym))
                                   sym
-                                  (symbol "cljs.core" (str sym)))
+                                  (symbol util/dkns-str (str sym)))
                           js-op {:js-op sym}
                           numeric #?(:clj  (-> mac-var meta ::numeric)
                                      :cljs (let [mac-var-ns   (symbol (namespace (.-sym mac-var)))
