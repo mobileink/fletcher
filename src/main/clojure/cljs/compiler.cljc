@@ -1434,7 +1434,7 @@
         (when env/*compiler*
           (:options @env/*compiler*))))
      ([opts]
-      (str "// Compiled by ClojureScript "
+      (str "// Compiled by Fletcher "
         (util/clojurescript-version)
         (when opts
           (str " " (pr-str (ana/build-affecting-options opts))))))))
